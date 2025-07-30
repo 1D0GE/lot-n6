@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cercador de Loteria de Nadal</title>
+  <title>Cercador de Loteria de Nadal 2.0</title>
   
   <!-- Tailwind CSS per a un disseny modern i responsiu -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -17,20 +17,41 @@
     /* Estils personalitzats */
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f0f2f5; /* Un gris més suau per al fons */
+      /* Fons nadalenc subtil amb SVG inline per no dependre d'arxius externs */
+      background-color: #f0f2f5;
+      background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d1d5db' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     }
     /* Animació per a l'aparició dels resultats */
     .resultat-item {
-      animation: fadeIn 0.5s ease-in-out;
+      animation: fadeIn 0.4s ease-in-out;
+      transition: all 0.3s ease;
     }
     @keyframes fadeIn {
       from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(15px);
       }
       to {
         opacity: 1;
         transform: translateY(0);
+      }
+    }
+    /* Estils per a la impressió */
+    @media print {
+      body {
+        background-image: none !important;
+      }
+      header, footer, .form-controls {
+        display: none !important;
+      }
+      main {
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      .resultat-item {
+        border: 1px solid #ccc;
+        box-shadow: none;
+        page-break-inside: avoid;
       }
     }
   </style>
@@ -38,46 +59,80 @@
 <body class="antialiased text-gray-800">
 
   <div class="min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md mx-auto">
+    <div class="w-full max-w-2xl mx-auto">
       
-      <!-- Títol i descripció -->
       <header class="text-center mb-8">
         <h1 class="text-4xl font-extrabold text-gray-900">Loteria de Nadal</h1>
-        <p class="text-gray-600 mt-2">Cerca el número.</p>
+        <p class="text-gray-600 mt-2">Cerca el teu número de la sort a la nostra administració.</p>
       </header>
 
-      <main class="bg-white rounded-2xl shadow-lg p-6 md:p-8">
-        <!-- Formulari de cerca -->
-        <div class="flex items-center space-x-2 border-2 border-gray-200 rounded-full p-2 focus-within:border-indigo-500 transition-colors">
-          <input 
-            type="text" 
-            id="busqueda" 
-            placeholder="Introdueix d'1 a 5 xifres..." 
-            maxlength="5"
-            class="w-full bg-transparent border-none focus:ring-0 text-lg px-4 py-1"
-            onkeyup="if(event.key === 'Enter') buscar()"
-          />
-          <button 
-            onclick="buscar()" 
-            class="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300"
-            aria-label="Cercar número"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </button>
+      <main class="bg-white rounded-2xl shadow-2xl p-6 md:p-8">
+        <!-- Controls del formulari -->
+        <div class="form-controls">
+            <!-- Barra de cerca principal -->
+            <div class="flex items-center space-x-2 border-2 border-gray-200 rounded-full p-2 focus-within:border-indigo-500 transition-colors">
+              <input 
+                type="text" 
+                id="busqueda" 
+                placeholder="Introdueix d'1 a 5 xifres..." 
+                maxlength="5"
+                pattern="\d{1,5}"
+                title="Introdueix només números (de 1 a 5 dígits)"
+                class="w-full bg-transparent border-none focus:ring-0 text-lg px-4 py-1"
+                onkeyup="buscar()"
+              />
+              <button 
+                onclick="buscar()" 
+                class="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300"
+                aria-label="Cercar número"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Filtres i opcions addicionals -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
+                <!-- Tipus de cerca -->
+                <div>
+                    <label for="tipoBusqueda" class="font-medium text-gray-700">Cercar per</label>
+                    <select id="tipoBusqueda" onchange="buscar()" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                      <option value="terminacion">Terminació</option>
+                      <option value="inicio">Inici</option>
+                      <option value="coincidencia">Coincidència</option>
+                      <option value="completo">Número complet</option>
+                    </select>
+                </div>
+                <!-- Ordenació -->
+                <div>
+                    <label for="orden" class="font-medium text-gray-700">Ordenar per</label>
+                    <select id="orden" onchange="buscar()" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                      <option value="numero">Número</option>
+                      <option value="disponibilidad">Disponibilitat</option>
+                    </select>
+                </div>
+                <!-- Filtre de disponibilitat -->
+                <div class="flex items-end justify-start md:justify-center">
+                    <div class="flex items-center h-full">
+                        <input type="checkbox" id="soloDisponibles" onchange="buscar()" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        <label for="soloDisponibles" class="ml-2 text-gray-700">Mostrar només disponibles</label>
+                    </div>
+                </div>
+            </div>
         </div>
+        
+        <!-- Comptador de resultats -->
+        <div id="contador" class="text-sm text-center text-gray-500 my-4 h-5"></div>
 
         <!-- Àrea de resultats -->
-        <div id="resultados" class="mt-6 space-y-3">
-          <!-- Els resultats de la cerca apareixeran aquí -->
-          <p class="text-center text-gray-500">Introdueix un número o terminació per començar.</p>
+        <div id="resultados" class="mt-2 space-y-3">
+          <p class="text-center text-gray-500">Introdueix un número per començar la cerca.</p>
         </div>
       </main>
 
-      <!-- Peu de pàgina -->
       <footer class="text-center mt-8">
-        <p class="text-sm text-gray-500">&copy; 2025 Administració nº6 - Tots els drets reservats.</p>
+        <p class="text-sm text-gray-500">&copy; 2024 La Teva Administració de Loteria - Tots els drets reservats.</p>
       </footer>
 
     </div>
@@ -129,6 +184,11 @@
       {"numero": "59349", "reservado": false}, {"numero": "63749", "reservado": false}
     ];
 
+    // Elements del DOM
+    const resultadosDiv = document.getElementById("resultados");
+    const contadorDiv = document.getElementById("contador");
+    const busquedaInput = document.getElementById("busqueda");
+    
     // Funció per generar el HTML d'un missatge d'estat
     function crearMissatge(text) {
         return `<div class="text-center p-4 bg-gray-50 rounded-lg">
@@ -138,57 +198,92 @@
 
     // Funció per generar el HTML d'un resultat
     function crearResultat(n) {
-        const statusClass = n.reservado ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
-        const statusText = n.reservado ? 'RESERVAT fins al novembre' : 'DISPONIBLE';
-        const dotClass = n.reservado ? 'bg-red-500' : 'bg-green-500';
+        const statusClass = n.reservado ? 'text-red-700' : 'text-green-700';
+        const borderClass = n.reservado ? 'border-l-red-500' : 'border-l-green-500';
+        const statusText = n.reservado ? 'RESERVAT' : 'DISPONIBLE';
+        const icon = n.reservado 
+            ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>`
+            : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
 
         return `
-            <div class="resultat-item flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+            <div class="resultat-item flex items-center justify-between p-4 bg-white border-l-4 ${borderClass} rounded-r-lg shadow-md hover:shadow-lg hover:scale-[1.02] transform">
                 <span class="text-2xl font-bold tracking-wider text-gray-800">${n.numero}</span>
-                <div class="flex items-center space-x-2">
-                    <div class="h-3 w-3 rounded-full ${dotClass}"></div>
-                    <span class="text-sm font-semibold ${statusClass} px-2.5 py-0.5 rounded-full">${statusText}</span>
+                <div class="flex items-center text-sm font-semibold ${statusClass}">
+                    ${icon}
+                    <span>${statusText}</span>
                 </div>
             </div>
         `;
     }
 
-    // === LÒGICA DE CERCA (SENSE MODIFICAR, NOMÉS ADAPTADA LA SORTIDA) ===
+    // === LÒGICA DE CERCA MILLORADA ===
     function buscar() {
-      const input = document.getElementById("busqueda").value.trim();
-      const resultadosDiv = document.getElementById("resultados");
-      resultadosDiv.innerHTML = ""; // Neteja els resultats anteriors
+      // Obtenir tots els valors dels filtres
+      const input = busquedaInput.value.trim();
+      const tipoBusqueda = document.getElementById("tipoBusqueda").value;
+      const soloDisponibles = document.getElementById("soloDisponibles").checked;
+      const orden = document.getElementById("orden").value;
 
       // Validació de l'entrada
-      if (!/^[0-9]{1,5}$/.test(input) && input.length > 0) {
+      if (!busquedaInput.checkValidity()) {
         resultadosDiv.innerHTML = crearMissatge("Cal que introdueixis només xifres (entre 1 i 5).");
+        contadorDiv.textContent = '';
         return;
       }
       
-      if (input.length === 0) {
-        resultadosDiv.innerHTML = crearMissatge("Introdueix un número o terminació per començar.");
-        return;
+      let resultados = [...numeros];
+
+      // 1. Filtrar per disponibilitat
+      if (soloDisponibles) {
+        resultados = resultados.filter(n => !n.reservado);
       }
 
-      // Filtrar els números
-      let resultados = [];
-      if (input.length < 5) {
-        // Cerca per terminació
-        resultados = numeros.filter(n => n.numero.endsWith(input));
-      } else {
-        // Cerca per número complet
-        resultados = numeros.filter(n => n.numero === input);
+      // 2. Filtrar per terme de cerca
+      if (input.length > 0) {
+        switch(tipoBusqueda) {
+          case 'terminacion':
+            resultados = resultados.filter(n => n.numero.endsWith(input));
+            break;
+          case 'inicio':
+            resultados = resultados.filter(n => n.numero.startsWith(input));
+            break;
+          case 'coincidencia':
+            resultados = resultados.filter(n => n.numero.includes(input));
+            break;
+          case 'completo':
+            resultados = resultados.filter(n => n.numero === input);
+            break;
+        }
       }
 
-      // Mostrar els resultats
+      // 3. Ordenar els resultats
+      resultados.sort((a, b) => {
+        if (orden === 'numero') {
+          return a.numero.localeCompare(b.numero);
+        }
+        if (orden === 'disponibilidad') {
+          if (a.reservado === b.reservado) { // Si tots dos estan disponibles o reservats, ordena per número
+            return a.numero.localeCompare(b.numero);
+          }
+          return a.reservado ? 1 : -1; // Els disponibles (false) van primer
+        }
+        return 0;
+      });
+      
+      // 4. Mostrar els resultats i el comptador
+      resultadosDiv.innerHTML = ""; // Neteja els resultats anteriors
+
       if (resultados.length === 0) {
-        resultadosDiv.innerHTML = crearMissatge("No s'ha trobat cap número que coincideixi.");
+        resultadosDiv.innerHTML = crearMissatge("No s'ha trobat cap número que coincideixi amb els filtres.");
+        contadorDiv.textContent = '0 resultats trobats.';
       } else {
-        // Ordena els resultats per número
-        resultados.sort((a, b) => a.numero.localeCompare(b.numero));
         resultadosDiv.innerHTML = resultados.map(crearResultat).join("");
+        contadorDiv.textContent = `${resultados.length} de ${numeros.length} números trobats.`;
       }
     }
+
+    // Executa la cerca inicial per mostrar tots els números al carregar la pàgina
+    window.onload = buscar;
   </script>
 </body>
 </html>
