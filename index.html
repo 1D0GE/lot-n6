@@ -3,20 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Gestió de Loteria de Nadal</title>
+  <title>Gestió de Loteria de Nadal v5</title>
   
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
+  <!-- Configuració de Tailwind per al Dark Mode -->
   <script>
     tailwind.config = {
       darkMode: 'class',
     }
   </script>
 
+  <!-- Font de Google 'Inter' -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
   
+  <!-- SDK de Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -83,6 +87,7 @@
         <nav class="absolute top-0 right-0 h-full bg-white dark:bg-gray-800 w-64 shadow-xl p-6">
           <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Menú</h2>
           <ul class="space-y-4">
+            <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="scan">📷 Modo Escáner</a></li>
             <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="cerca">Cerca de Números</a></li>
             <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="control">Control de Vendes</a></li>
             <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="gestio">Gestió BBDD</a></li>
@@ -96,6 +101,20 @@
       </header>
 
       <main class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        
+        <!-- SECCIÓ NOVA: Modo Escáner -->
+        <div id="page-scan" class="page-section">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold mb-3">Modo Escáner</h2>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">El camp de text s'activarà automàticament. Comença a escanejar els codis de barres dels dècims.</p>
+                <input type="text" id="barcode-input" placeholder="Esperant escaneig..." class="w-full text-center text-2xl p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg focus:border-indigo-500 dark:focus:border-indigo-400 transition-colors bg-gray-50 dark:bg-gray-700/50 dark:text-white" />
+                <div id="scan-feedback" class="mt-4 h-12 flex items-center justify-center">
+                    <p class="text-gray-500 dark:text-gray-400">L'últim resultat apareixerà aquí.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓ 1: Cerca de Números -->
         <div id="page-cerca" class="page-section">
           <div class="form-controls">
             <div class="flex items-center space-x-2 border-2 border-gray-200 dark:border-gray-600 rounded-full p-2 focus-within:border-indigo-500 dark:focus-within:border-indigo-400 transition-colors">
@@ -132,6 +151,7 @@
           <div id="resultados-cerca" class="mt-2 space-y-3"></div>
         </div>
 
+        <!-- SECCIÓ 2: Control de Vendes -->
         <div id="page-control" class="page-section">
           <div class="mb-4">
               <input type="text" id="busqueda-control" placeholder="Cerca un número per vendre..." class="w-full p-3 border-2 border-gray-200 rounded-full focus:border-indigo-500 transition-colors dark:bg-gray-700 dark:border-gray-600 dark:text-white">
@@ -139,6 +159,7 @@
           <div id="resultados-control" class="space-y-3"></div>
         </div>
 
+        <!-- SECCIÓ 3: Gestió BBDD -->
         <div id="page-gestio" class="page-section">
             <h2 class="text-2xl font-bold mb-4">Panell d'Administració</h2>
             <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
@@ -178,7 +199,7 @@
       </main>
 
       <footer class="text-center mt-8">
-        <p class="text-sm text-gray-500 dark:text-gray-400">&copy; 2025 Administració nº6 - Tots els drets reservats.</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">&copy; 2025 Administració - Tots els drets reservats.</p>
       </footer>
     </div>
   </div>
@@ -240,7 +261,8 @@
       numeros: [],
       historial: [],
       cistella: {},
-      paginaActual: 'cerca'
+      paginaActual: 'cerca',
+      scanTimeout: null // Per gestionar el debounce del escàner
     };
 
     // === ELEMENTS DEL DOM ===
@@ -255,25 +277,38 @@
     const themeToggleButton = document.getElementById('theme-toggle');
     const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
     const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+    const barcodeInput = document.getElementById('barcode-input');
+    const scanFeedback = document.getElementById('scan-feedback');
 
     // === LÒGICA DE NAVEGACIÓ ===
     function canviarPagina(idPagina) {
         appState.paginaActual = idPagina;
         const link = document.querySelector(`.nav-link[data-page='${idPagina}']`);
-        pageTitle.innerHTML = `🎄 ${link.textContent} 🎄`;
+        pageTitle.innerHTML = `🎄 ${link.innerHTML} 🎄`;
         pageSubtitle.textContent = {
+            scan: "Escaneja un dècim per vendre'l.",
             cerca: "Cerca el número.",
             control: "Gestiona les vendes.",
             gestio: "Administra la base de dades."
         }[idPagina];
 
         pageSections.forEach(section => section.classList.toggle('active', section.id === `page-${idPagina}`));
+        navLinks.forEach(navLink => {
+            navLink.classList.toggle('text-indigo-600', navLink.dataset.page === idPagina);
+            navLink.classList.toggle('dark:text-indigo-400', navLink.dataset.page === idPagina);
+        });
+        
         navigationPanel.classList.add('hidden');
         renderitzarPaginaActual();
+        
+        if (idPagina === 'scan') {
+            setTimeout(() => barcodeInput.focus(), 100);
+        }
     }
     
     function renderitzarPaginaActual() {
         switch(appState.paginaActual) {
+            case 'scan': /* No cal renderitzar res, la pàgina és estàtica */ break;
             case 'cerca': renderitzarCerca(); break;
             case 'control': renderitzarControl(); break;
             case 'gestio': renderitzarGestio(); break;
@@ -283,7 +318,14 @@
     menuButton.addEventListener('click', () => navigationPanel.classList.toggle('hidden'));
     navigationPanel.addEventListener('click', (e) => { if (e.target === navigationPanel) navigationPanel.classList.add('hidden'); });
     navLinks.forEach(link => {
-        link.addEventListener('click', (e) => { e.preventDefault(); canviarPagina(e.target.dataset.page); });
+        link.addEventListener('click', (e) => { e.preventDefault(); canviarPagina(e.target.closest('.nav-link').dataset.page); });
+    });
+    
+    // Gestió de focus intel·ligent per al escàner
+    document.body.addEventListener('click', (e) => {
+        if (appState.paginaActual === 'scan' && !e.target.matches('input, button, a, .nav-link')) {
+            barcodeInput.focus();
+        }
     });
 
     // === LÒGICA DE DADES (FIREBASE) ===
@@ -301,9 +343,10 @@
     historialRef.on('value', (snapshot) => {
         const data = snapshot.val();
         appState.historial = data ? Object.values(data).reverse() : [];
-        if (appState.paginaActual === 'gestio') {
-            renderitzarHistorial();
-        }
+        // === INICI DE LA CORRECCIÓ ===
+        // Ja no es crida a renderitzarHistorial() aquí.
+        // La renderització es farà només quan l'usuari faci clic a la pestanya d'historial.
+        // === FI DE LA CORRECCIÓ ===
     });
 
     // === FUNCIONS D'UTILITAT ===
@@ -329,6 +372,63 @@
             missatge: missatge
         };
         database.ref('historial').push(entrada);
+    }
+
+    // === SECCIÓ DE ESCÀNER ===
+    barcodeInput.addEventListener('input', () => {
+        clearTimeout(appState.scanTimeout); // Anul·la el temporitzador anterior
+        const code = barcodeInput.value.trim();
+        
+        if (code.length === 20) {
+            // Utilitzem un petit retard per assegurar que el lector ha acabat d'escriure
+            appState.scanTimeout = setTimeout(() => processarEscaneig(code), 50);
+        }
+    });
+
+    function processarEscaneig(code) {
+        if (!/^\d{20}$/.test(code)) {
+            scanFeedback.innerHTML = `<p class="text-red-500 font-semibold">Codi invàlid. Ha de ser de 20 dígits.</p>`;
+            barcodeInput.value = '';
+            return;
+        }
+
+        const numeroExtret = code.substr(11, 5);
+        const numero = appState.numeros.find(n => n.id === numeroExtret);
+
+        if (!numero) {
+            mostrarNotificacio(`Número ${numeroExtret} no trobat a la BBDD.`, 'error');
+            scanFeedback.innerHTML = `<p class="text-red-500 font-semibold">❌ Número ${numeroExtret} no trobat</p>`;
+            barcodeInput.value = '';
+            barcodeInput.focus();
+            return;
+        }
+
+        if (numero.estoc <= 0) {
+            mostrarNotificacio(`El número ${numeroExtret} ja està esgotat.`, 'error');
+            scanFeedback.innerHTML = `<p class="text-orange-500 font-semibold">⚠️ Número ${numeroExtret} esgotat</p>`;
+            barcodeInput.value = '';
+            barcodeInput.focus();
+            return;
+        }
+
+        const nouEstoc = numero.estoc - 1;
+        const nouEstat = (nouEstoc === 0) ? 'venut' : numero.estat;
+
+        database.ref(`numeros/${numero.id}`).update({ estoc: nouEstoc, estat: nouEstat })
+            .then(() => {
+                const missatge = `Venda Escàner: 1 dècim del ${numero.id}. Estoc restant: ${nouEstoc}.`;
+                registrarHistorial(missatge);
+                mostrarNotificacio(`Dècim ${numero.id} venut!`);
+                scanFeedback.innerHTML = `<p class="text-green-500 font-semibold">✅ Venut ${numero.id}. Queden ${nouEstoc}.</p>`;
+            })
+            .catch(error => {
+                mostrarNotificacio(`Error en vendre ${numero.id}: ${error.message}`, 'error');
+                scanFeedback.innerHTML = `<p class="text-red-500 font-semibold">Error de xarxa. Torna a intentar-ho.</p>`;
+            })
+            .finally(() => {
+                barcodeInput.value = '';
+                barcodeInput.focus();
+            });
     }
 
     // === SECCIÓ DE CERCA ===
@@ -406,16 +506,10 @@
                         <span>${statusText}</span>
                     </div>`;
                 
-                // ======================================================
-                // ================ INICI DE LA MODIFICACIÓ ===============
-                // ======================================================
                 if (n.estat !== 'venut') {
                     item.classList.add('cursor-pointer');
                     item.addEventListener('click', () => obrirPopupVenda(n.id));
                 }
-                // ======================================================
-                // ================== FI DE LA MODIFICACIÓ ================
-                // ======================================================
 
                 cercaElements.resultados.appendChild(item);
             });
@@ -730,6 +824,12 @@
             document.querySelectorAll('.tab-content').forEach(content => {
                 content.classList.toggle('hidden', content.id !== `tab-${tabId}`);
             });
+            // === INICI DE LA CORRECCIÓ ===
+            // Si la pestanya seleccionada és la de l'historial, el redibuixem.
+            if (tabId === 'gestio-historial') {
+                renderitzarHistorial();
+            }
+            // === FI DE LA CORRECCIÓ ===
         });
     });
     document.querySelector('.tab-button[data-tab="gestio-numeros"]').classList.add('active'); // Activar la primera per defecte
