@@ -1,293 +1,827 @@
 <!DOCTYPE html>
-<html lang="ca">
+<html lang="ca" class="">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Cercador de Loteria de Nadal</title>
+  <title>Gestió de Loteria de Nadal</title>
   
-  <!-- Tailwind CSS per a un disseny modern i responsiu -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Font de Google 'Inter' per a una millor llegibilitat -->
+  <!-- Configuració de Tailwind per al Dark Mode -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+
+  <!-- Font de Google 'Inter' -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+  
+  <!-- SDK de Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
   <style>
-    /* Estils personalitzats */
     body {
       font-family: 'Inter', sans-serif;
-      /* Fons nadalenc subtil amb SVG inline per no dependre d'arxius externs */
       background-color: #f0f2f5;
       background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d1d5db' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     }
-    /* Animació per a l'aparició dels resultats */
-    .resultat-item {
+    .dark body {
+        background-image: none;
+    }
+    .page-section { display: none; }
+    .page-section.active { display: block; }
+    .resultat-item, .control-item {
       animation: fadeIn 0.4s ease-in-out;
       transition: all 0.3s ease;
     }
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(15px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+     @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    /* Estils per a la impressió */
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 9999px; color: white; z-index: 1001; opacity: 0; transition: opacity 0.5s, bottom 0.5s; animation: fadeInOut 4s ease-in-out; }
+    .toast.success { background-color: #28a745; }
+    .toast.error { background-color: #dc3545; }
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0; bottom: 0px; }
+      10%, 90% { opacity: 1; bottom: 20px; }
+    }
+    .tab-button.active {
+        border-color: #4f46e5;
+        background-color: #eef2ff;
+        color: #4f46e5;
+    }
+    .dark .tab-button.active {
+        border-color: #6366f1;
+        background-color: #3730a3;
+        color: #e0e7ff;
+    }
     @media print {
-      body {
-        background-image: none !important;
-      }
-      header, footer, .form-controls {
-        display: none !important;
-      }
-      main {
-        box-shadow: none !important;
-        padding: 0 !important;
-      }
-      .resultat-item {
-        border: 1px solid #ccc;
-        box-shadow: none;
-        page-break-inside: avoid;
-      }
+      body { background-image: none !important; }
+      header, footer, .form-controls, #menu-button, #cart-button, .modal, #theme-toggle { display: none !important; }
+      main { box-shadow: none !important; padding: 0 !important; }
+      .dark body { background-color: #ffffff !important; }
     }
   </style>
 </head>
-<body class="antialiased text-gray-800">
+<body class="antialiased text-gray-800 dark:bg-gray-900 dark:text-gray-300 transition-colors duration-300">
 
+  <!-- ===== ESTRUCTURA PRINCIPAL DE L'APP ===== -->
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-2xl mx-auto">
       
+      <!-- Controls de la cantonada superior dreta -->
+      <div class="fixed top-4 right-4 z-50 flex items-center space-x-4">
+        <!-- Botó de Mode Fosc/Clar -->
+        <button id="theme-toggle" type="button" class="bg-white dark:bg-gray-800 p-3 rounded-full shadow-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+            <svg id="theme-toggle-dark-icon" class="hidden h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+            <svg id="theme-toggle-light-icon" class="hidden h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05A1 1 0 003.636 6.464l.707.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zM6.464 14.364a1 1 0 00-1.414 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
+        </button>
+        <!-- Menú Burger -->
+        <button id="menu-button" class="bg-white dark:bg-gray-800 p-3 rounded-full shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+        </button>
+      </div>
+
+      <!-- Panell de Navegació -->
+      <div id="navigation-panel" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 z-40">
+        <nav class="absolute top-0 right-0 h-full bg-white dark:bg-gray-800 w-64 shadow-xl p-6">
+          <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Menú</h2>
+          <ul class="space-y-4">
+            <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="cerca">Cerca de Números</a></li>
+            <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="control">Control de Vendes</a></li>
+            <li><a href="#" class="nav-link text-lg text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400" data-page="gestio">Gestió BBDD</a></li>
+          </ul>
+        </nav>
+      </div>
+
       <header class="text-center mb-8">
-        <h1 class="text-4xl font-extrabold text-gray-900">🎄Loteria de Nadal 2025🎄</h1>
-        <p class="text-gray-600 mt-2">Cerca el número.</p>
+        <h1 id="page-title" class="text-4xl font-extrabold text-gray-900 dark:text-white">🎄 Loteria de Nadal 🎄</h1>
+        <p id="page-subtitle" class="text-gray-600 dark:text-gray-400 mt-2">Cerca el número.</p>
       </header>
 
-      <main class="bg-white rounded-2xl shadow-2xl p-6 md:p-8">
-        <!-- Controls del formulari -->
-        <div class="form-controls">
-            <!-- Barra de cerca principal -->
-            <div class="flex items-center space-x-2 border-2 border-gray-200 rounded-full p-2 focus-within:border-indigo-500 transition-colors">
-              <input 
-                type="text" 
-                id="busqueda" 
-                placeholder="Introdueix d'1 a 5 xifres..." 
-                maxlength="5"
-                pattern="\d{1,5}"
-                title="Introdueix només números (de 1 a 5 dígits)"
-                class="w-full bg-transparent border-none focus:ring-0 text-lg px-4 py-1"
-                onkeyup="buscar()"
-              />
-              <button 
-                onclick="buscar()" 
-                class="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition-all duration-300"
-                aria-label="Cercar número"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </button>
+      <main class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
+        <!-- SECCIÓ 1: Cerca de Números -->
+        <div id="page-cerca" class="page-section">
+          <div class="form-controls">
+            <div class="flex items-center space-x-2 border-2 border-gray-200 dark:border-gray-600 rounded-full p-2 focus-within:border-indigo-500 dark:focus-within:border-indigo-400 transition-colors">
+              <input type="text" id="busqueda" placeholder="Introdueix d'1 a 5 xifres..." maxlength="5" pattern="\d{1,5}" class="w-full bg-transparent border-none focus:ring-0 text-lg px-4 py-1 dark:text-white"/>
             </div>
-
-            <!-- Filtres i opcions addicionals -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
-                <!-- Tipus de cerca -->
-                <div>
-                    <label for="tipoBusqueda" class="font-medium text-gray-700">Cercar per</label>
-                    <select id="tipoBusqueda" onchange="buscar()" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                      <option value="terminacion">Terminació</option>
-                      <option value="inicio">Inici</option>
-                      <option value="coincidencia">Coincidència</option>
-                      <option value="completo">Número complet</option>
-                    </select>
-                </div>
-                <!-- Ordenació -->
-                <div>
-                    <label for="orden" class="font-medium text-gray-700">Ordenar per</label>
-                    <select id="orden" onchange="buscar()" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
-                      <option value="numero">Número</option>
-                      <option value="disponibilidad">Disponibilitat</option>
-                    </select>
-                </div>
-                <!-- Filtre de disponibilitat -->
-                <div class="flex items-end justify-start md:justify-center">
-                    <div class="flex items-center h-full">
-                        <input type="checkbox" id="soloDisponibles" onchange="buscar()" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                        <label for="soloDisponibles" class="ml-2 text-gray-700">Mostrar només disponibles</label>
-                    </div>
-                </div>
+              <div>
+                  <label for="tipoBusqueda" class="font-medium text-gray-700 dark:text-gray-300">Cercar per</label>
+                  <select id="tipoBusqueda" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="terminacion">Terminació</option>
+                    <option value="inicio">Inici</option>
+                    <option value="coincidencia">Coincidència</option>
+                    <option value="completo">Número complet</option>
+                    <option value="capicua">Capicúes</option>
+                    <option value="repetits">Amb xifres repetides</option>
+                  </select>
+              </div>
+              <div>
+                  <label for="orden" class="font-medium text-gray-700 dark:text-gray-300">Ordenar per</label>
+                  <select id="orden" class="w-full mt-1 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="numero">Número (terminació)</option>
+                    <option value="disponibilidad">Disponibilitat</option>
+                  </select>
+              </div>
+              <div class="flex items-end justify-start md:justify-center">
+                  <div class="flex items-center h-full">
+                      <input type="checkbox" id="soloDisponibles" class="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600">
+                      <label for="soloDisponibles" class="ml-2 text-gray-700 dark:text-gray-300">Mostrar només disponibles</label>
+                  </div>
+              </div>
             </div>
+          </div>
+          <div id="contador-cerca" class="text-sm text-center text-gray-500 dark:text-gray-400 my-4 h-5"></div>
+          <div id="resultados-cerca" class="mt-2 space-y-3"></div>
         </div>
-        
-        <!-- Comptador de resultats -->
-        <div id="contador" class="text-sm text-center text-gray-500 my-4 h-5"></div>
 
-        <!-- Àrea de resultats -->
-        <div id="resultados" class="mt-2 space-y-3">
-          <p class="text-center text-gray-500">Introdueix un número per començar la cerca.</p>
+        <!-- SECCIÓ 2: Control de Vendes -->
+        <div id="page-control" class="page-section">
+          <div class="mb-4">
+              <input type="text" id="busqueda-control" placeholder="Cerca un número per vendre..." class="w-full p-3 border-2 border-gray-200 rounded-full focus:border-indigo-500 transition-colors dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+          </div>
+          <div id="resultados-control" class="space-y-3"></div>
+        </div>
+
+        <!-- SECCIÓ 3: Gestió BBDD -->
+        <div id="page-gestio" class="page-section">
+            <h2 class="text-2xl font-bold mb-4">Panell d'Administració</h2>
+            <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
+                <nav class="-mb-px flex space-x-4" aria-label="Tabs">
+                    <button class="tab-button whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500" data-tab="gestio-numeros">Gestionar Números</button>
+                    <button class="tab-button whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500" data-tab="gestio-eines">Eines</button>
+                    <button class="tab-button whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500" data-tab="gestio-historial">Historial</button>
+                </nav>
+            </div>
+            <div id="tab-gestio-numeros" class="tab-content space-y-6">
+              <div>
+                <h3 class="text-lg font-semibold mb-2">Afegir Nou Número</h3>
+                <div class="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
+                  <input type="text" id="gestio-nou-numero" placeholder="Número (5 xifres)" maxlength="5" class="p-2 border rounded-md flex-1 dark:bg-gray-700 dark:border-gray-600">
+                  <input type="number" id="gestio-nou-estoc" placeholder="Estoc inicial" class="p-2 border rounded-md flex-1 dark:bg-gray-700 dark:border-gray-600">
+                  <button id="gestio-afegir-btn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex-1">Afegir</button>
+                </div>
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold mb-2">Gestionar Números Existents</h3>
+                <div class="mb-4">
+                    <input type="text" id="gestio-busqueda" placeholder="Cerca un número per gestionar..." class="w-full p-3 border-2 border-gray-200 rounded-full focus:border-indigo-500 transition-colors dark:bg-gray-700 dark:border-gray-600">
+                </div>
+                <div id="gestio-llista" class="space-y-2 max-h-96 overflow-y-auto pr-2"></div>
+              </div>
+            </div>
+            <div id="tab-gestio-eines" class="tab-content hidden space-y-4">
+                <h3 class="text-lg font-semibold">Eines d'Administració</h3>
+                <button id="eina-alliberar-reservats" class="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700">Alliberar tots els Reservats</button>
+                <button id="eina-exportar-csv" class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Exportar a CSV</button>
+            </div>
+            <div id="tab-gestio-historial" class="tab-content hidden">
+                <h3 class="text-lg font-semibold mb-2">Historial de Canvis Recents</h3>
+                <div id="historial-llista" class="space-y-2 max-h-96 overflow-y-auto pr-2"></div>
+            </div>
         </div>
       </main>
 
       <footer class="text-center mt-8">
-        <p class="text-sm text-gray-500">&copy; 2025 Administració nº6 - Tots els drets reservats.</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">&copy; 2025 Administració - Tots els drets reservats.</p>
       </footer>
-
     </div>
   </div>
 
+  <!-- Botó flotant de la Cistella -->
+  <button id="cart-button" class="hidden fixed bottom-6 right-6 z-30 bg-indigo-600 text-white py-3 px-5 rounded-full shadow-lg hover:bg-indigo-700">
+      Cistella (<span id="cart-count">0</span>)
+  </button>
+
+  <!-- Popup / Modal per a la venda ràpida -->
+  <div id="venda-popup" class="hidden modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-11/12 max-w-md">
+          <h2 class="text-2xl font-bold mb-4 dark:text-white">Vendre Número: <span id="popup-numero"></span></h2>
+          <p class="mb-2">Estoc actual: <span id="popup-estoc-actual" class="font-semibold"></span></p>
+          <div class="my-4">
+              <label for="popup-quantitat" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Quantitat a vendre</label>
+              <input type="number" id="popup-quantitat" value="1" min="1" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600">
+          </div>
+          <div class="flex space-x-2 my-4">
+              <button class="quick-add-btn bg-gray-200 dark:bg-gray-600 dark:hover:bg-gray-500 p-2 rounded-md flex-1 hover:bg-gray-300" data-qty="1">+1</button>
+              <button class="quick-add-btn bg-gray-200 dark:bg-gray-600 dark:hover:bg-gray-500 p-2 rounded-md flex-1 hover:bg-gray-300" data-qty="5">+5</button>
+              <button class="quick-add-btn bg-gray-200 dark:bg-gray-600 dark:hover:bg-gray-500 p-2 rounded-md flex-1 hover:bg-gray-300" data-qty="10">+10</button>
+          </div>
+          <div class="flex justify-end space-x-3 mt-6">
+              <button id="popup-cancelar" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">Cancel·lar</button>
+              <button id="popup-actualitzar" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Actualitzar Estoc</button>
+          </div>
+      </div>
+  </div>
+
+  <!-- Popup / Modal per a la cistella -->
+  <div id="cistella-popup" class="hidden modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+      <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-11/12 max-w-lg">
+          <h2 class="text-2xl font-bold mb-4 dark:text-white">Cistella de la Compra</h2>
+          <div id="cistella-contingut" class="max-h-64 overflow-y-auto space-y-3 mb-4">
+              <!-- El contingut de la cistella es generarà aquí -->
+          </div>
+          <div class="flex justify-end space-x-3 mt-6">
+              <button id="cistella-tancar" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">Tancar</button>
+              <button id="cistella-processar" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Processar Venda</button>
+          </div>
+      </div>
+  </div>
+
   <script>
-    // === DADES DELS NÚMEROS ===
-    const numeros = [
-      {"numero": "49480", "reservado": false}, {"numero": "15192", "reservado": false},
-      {"numero": "28924", "reservado": false}, {"numero": "67936", "reservado": false},
-      {"numero": "94327", "reservado": false}, {"numero": "92738", "reservado": false},
-      {"numero": "60411", "reservado": false}, {"numero": "74653", "reservado": false},
-      {"numero": "67805", "reservado": false}, {"numero": "44899", "reservado": false},
-      {"numero": "09199", "reservado": false}, {"numero": "55971", "reservado": false},
-      {"numero": "89118", "reservado": false}, {"numero": "11063", "reservado": false},
-      {"numero": "79889", "reservado": false}, {"numero": "37105", "reservado": false},
-      {"numero": "50435", "reservado": false}, {"numero": "15296", "reservado": false},
-      {"numero": "84925", "reservado": false}, {"numero": "00517", "reservado": false},
-      {"numero": "33146", "reservado": true}, {"numero": "40522", "reservado": true},
-      {"numero": "70763", "reservado": false}, {"numero": "61166", "reservado": true},
-      {"numero": "07899", "reservado": false}, {"numero": "98045", "reservado": false},
-      {"numero": "15959", "reservado": true}, {"numero": "72069", "reservado": true},
-      {"numero": "18657", "reservado": true}, {"numero": "15461", "reservado": true},
-      {"numero": "16986", "reservado": true}, {"numero": "19398", "reservado": true},
-      {"numero": "23460", "reservado": true}, {"numero": "30113", "reservado": true},
-      {"numero": "86989", "reservado": true}, {"numero": "96951", "reservado": false},
-      {"numero": "35551", "reservado": false}, {"numero": "12533", "reservado": false},
-      {"numero": "81821", "reservado": false}, {"numero": "62868", "reservado": false},
-      {"numero": "93821", "reservado": false}, {"numero": "38878", "reservado": false},
-      {"numero": "01663", "reservado": false}, {"numero": "51691", "reservado": false},
-      {"numero": "29533", "reservado": false}, {"numero": "20403", "reservado": false},
-      {"numero": "48701", "reservado": false}, {"numero": "87998", "reservado": false},
-      {"numero": "10339", "reservado": false}, {"numero": "46603", "reservado": false},
-      {"numero": "47561", "reservado": false}, {"numero": "22218", "reservado": false},
-      {"numero": "91811", "reservado": false}, {"numero": "32893", "reservado": false},
-      {"numero": "21198", "reservado": false}, {"numero": "58733", "reservado": false},
-      {"numero": "24081", "reservado": false}, {"numero": "03211", "reservado": false},
-      {"numero": "04668", "reservado": false}, {"numero": "90388", "reservado": false},
-      {"numero": "65033", "reservado": false}, {"numero": "36431", "reservado": false},
-      {"numero": "45988", "reservado": false}, {"numero": "06188", "reservado": false},
-      {"numero": "78228", "reservado": false}, {"numero": "64639", "reservado": false},
-      {"numero": "56228", "reservado": false}, {"numero": "52901", "reservado": false},
-      {"numero": "31343", "reservado": false}, {"numero": "03495", "reservado": false},
-      {"numero": "32685", "reservado": false}, {"numero": "35605", "reservado": false},
-      {"numero": "88895", "reservado": false}, {"numero": "85218", "reservado": false},
-      {"numero": "27974", "reservado": false}, {"numero": "05829", "reservado": false},
-      {"numero": "71681", "reservado": false}, {"numero": "75859", "reservado": false},
-      {"numero": "82199", "reservado": false}, {"numero": "80008", "reservado": false},
-      {"numero": "59349", "reservado": false}, {"numero": "63749", "reservado": false}
-    ];
+    // La teva configuració de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCv5nHcQKeyKE9hNP_DF2DT_aKjXjUMzvk",
+      authDomain: "bbdd-lot.firebaseapp.com",
+      databaseURL: "https://bbdd-lot-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "bbdd-lot",
+      storageBucket: "bbdd-lot.appspot.com",
+      messagingSenderId: "37933506670",
+      appId: "1:37933506670:web:d8246cbebd04e03c6e467f"
+    };
 
-    // Elements del DOM
-    const resultadosDiv = document.getElementById("resultados");
-    const contadorDiv = document.getElementById("contador");
-    const busquedaInput = document.getElementById("busqueda");
+    // Inicialització de Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // === ESTAT GLOBAL DE L'APLICACIÓ ===
+    const appState = {
+      numeros: [],
+      historial: [],
+      cistella: {},
+      paginaActual: 'cerca'
+    };
+
+    // === ELEMENTS DEL DOM ===
+    const pageTitle = document.getElementById('page-title');
+    const pageSubtitle = document.getElementById('page-subtitle');
+    const pageSections = document.querySelectorAll('.page-section');
+    const navLinks = document.querySelectorAll('.nav-link');
+    const menuButton = document.getElementById('menu-button');
+    const navigationPanel = document.getElementById('navigation-panel');
+    const cartButton = document.getElementById('cart-button');
+    const cartCount = document.getElementById('cart-count');
+    const themeToggleButton = document.getElementById('theme-toggle');
+    const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+    const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+    // === LÒGICA DE NAVEGACIÓ ===
+    function canviarPagina(idPagina) {
+        appState.paginaActual = idPagina;
+        const link = document.querySelector(`.nav-link[data-page='${idPagina}']`);
+        pageTitle.innerHTML = `🎄 ${link.textContent} 🎄`;
+        pageSubtitle.textContent = {
+            cerca: "Cerca el número.",
+            control: "Gestiona les vendes.",
+            gestio: "Administra la base de dades."
+        }[idPagina];
+
+        pageSections.forEach(section => section.classList.toggle('active', section.id === `page-${idPagina}`));
+        navigationPanel.classList.add('hidden');
+        renderitzarPaginaActual();
+    }
     
-    // Funció per generar el HTML d'un missatge d'estat
-    function crearMissatge(text) {
-        return `<div class="text-center p-4 bg-gray-50 rounded-lg">
-                    <p class="text-gray-600 font-medium">${text}</p>
-                </div>`;
+    function renderitzarPaginaActual() {
+        switch(appState.paginaActual) {
+            case 'cerca': renderitzarCerca(); break;
+            case 'control': renderitzarControl(); break;
+            case 'gestio': renderitzarGestio(); break;
+        }
     }
 
-    // Funció per generar el HTML d'un resultat
-    function crearResultat(n) {
-        const statusClass = n.reservado ? 'text-red-700' : 'text-green-700';
-        const borderClass = n.reservado ? 'border-l-red-500' : 'border-l-green-500';
-        const statusText = n.reservado ? 'RESERVAT' : 'DISPONIBLE';
-        const icon = n.reservado 
-            ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>`
-            : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+    menuButton.addEventListener('click', () => navigationPanel.classList.toggle('hidden'));
+    navigationPanel.addEventListener('click', (e) => { if (e.target === navigationPanel) navigationPanel.classList.add('hidden'); });
+    navLinks.forEach(link => {
+        link.addEventListener('click', (e) => { e.preventDefault(); canviarPagina(e.target.dataset.page); });
+    });
 
-        return `
-            <div class="resultat-item flex items-center justify-between p-4 bg-white border-l-4 ${borderClass} rounded-r-lg shadow-md hover:shadow-lg hover:scale-[1.02] transform">
-                <span class="text-2xl font-bold tracking-wider text-gray-800">${n.numero}</span>
-                <div class="flex items-center text-sm font-semibold ${statusClass}">
-                    ${icon}
-                    <span>${statusText}</span>
+    // === LÒGICA DE DADES (FIREBASE) ===
+    const numerosRef = database.ref('numeros');
+    numerosRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      appState.numeros = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+      renderitzarPaginaActual();
+    }, (error) => {
+        console.error("Error llegint de Firebase: ", error);
+        mostrarNotificacio("Error de connexió amb la base de dades", "error");
+    });
+    
+    const historialRef = database.ref('historial').limitToLast(50);
+    historialRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        appState.historial = data ? Object.values(data).reverse() : [];
+        if (appState.paginaActual === 'gestio') {
+            renderitzarHistorial();
+        }
+    });
+
+    // === FUNCIONS D'UTILITAT ===
+    function formatarEstoc(estoc) {
+        if (estoc === 0) return '0 sèries, 0 dècims';
+        const series = Math.floor(estoc / 10);
+        const decimos = estoc % 10;
+        return `${series} sèries i ${decimos} dècims`;
+    }
+
+    function mostrarNotificacio(missatge, tipus = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipus}`;
+        toast.textContent = missatge;
+        document.body.appendChild(toast);
+        setTimeout(() => { if (document.body.contains(toast)) document.body.removeChild(toast); }, 4000);
+    }
+    
+    function registrarHistorial(missatge) {
+        const timestamp = new Date().toLocaleString('ca-ES', { dateStyle: 'short', timeStyle: 'medium' });
+        const entrada = {
+            data: timestamp,
+            missatge: missatge
+        };
+        database.ref('historial').push(entrada);
+    }
+
+    // === SECCIÓ DE CERCA ===
+    const cercaElements = {
+      input: document.getElementById('busqueda'),
+      tipo: document.getElementById('tipoBusqueda'),
+      orden: document.getElementById('orden'),
+      disponibles: document.getElementById('soloDisponibles'),
+      contador: document.getElementById('contador-cerca'),
+      resultados: document.getElementById('resultados-cerca')
+    };
+
+    function renderitzarCerca() {
+        let resultados = [...appState.numeros];
+        const input = cercaElements.input.value.trim();
+        const tipoBusqueda = cercaElements.tipo.value;
+        const soloDisponibles = cercaElements.disponibles.checked;
+        const orden = cercaElements.orden.value;
+
+        if (soloDisponibles) {
+            resultados = resultados.filter(n => n.estat === 'disponible');
+        }
+
+        if (input.length > 0 && cercaElements.input.checkValidity()) {
+            switch(tipoBusqueda) {
+                case 'terminacion': resultados = resultados.filter(n => n.id.endsWith(input)); break;
+                case 'inicio': resultados = resultados.filter(n => n.id.startsWith(input)); break;
+                case 'coincidencia': resultados = resultados.filter(n => n.id.includes(input)); break;
+                case 'completo': resultados = resultados.filter(n => n.id === input); break;
+                case 'capicua': resultados = resultados.filter(n => n.id === n.id.split('').reverse().join('') && n.id.length > 1); break;
+                case 'repetits': resultados = resultados.filter(n => /(.)\1/.test(n.id)); break;
+            }
+        }
+        
+        resultados.sort((a, b) => {
+            if (orden === 'numero') {
+                const reversedA = a.id.split('').reverse().join('');
+                const reversedB = b.id.split('').reverse().join('');
+                return reversedA.localeCompare(reversedB);
+            }
+            if (orden === 'disponibilidad') {
+                const order = { 'disponible': 1, 'reservat': 2, 'venut': 3 };
+                return (order[a.estat] || 4) - (order[b.estat] || 4);
+            }
+            return 0;
+        });
+
+        cercaElements.resultados.innerHTML = "";
+        if (resultados.length === 0) {
+            cercaElements.resultados.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400">No s\'ha trobat cap número.</p>';
+        } else {
+            resultados.forEach(n => {
+                const item = document.createElement('div');
+                item.className = 'resultat-item flex items-center justify-between p-4 bg-white dark:bg-gray-800/50 border-l-4 rounded-r-lg shadow-md hover:shadow-lg hover:scale-[1.02] transform';
+                
+                let colorClass = 'gray-400', statusText = n.estat.toUpperCase(), icon = '';
+                if (n.estat === 'disponible') {
+                    colorClass = 'green-500';
+                    icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>`;
+                } else if (n.estat === 'reservat') {
+                    colorClass = 'orange-500';
+                    icon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd" /></svg>`;
+                } else if (n.estat === 'venut') {
+                    colorClass = 'red-500';
+                }
+
+                item.classList.add(`border-${colorClass}`);
+                item.innerHTML = `
+                    <div>
+                        <span class="text-2xl font-bold tracking-wider text-gray-800 dark:text-gray-200">${n.id}</span>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${formatarEstoc(n.estoc)}</p>
+                    </div>
+                    <div class="flex items-center text-sm font-semibold text-${colorClass}">
+                        ${icon}
+                        <span>${statusText}</span>
+                    </div>`;
+                cercaElements.resultados.appendChild(item);
+            });
+        }
+        cercaElements.contador.textContent = `${resultados.length} resultats trobats.`;
+    }
+
+    [cercaElements.input, cercaElements.tipo, cercaElements.orden, cercaElements.disponibles].forEach(el => {
+        el.addEventListener('input', renderitzarCerca);
+    });
+
+    // === SECCIÓ CONTROL DE VENDES ===
+    const controlSearchInput = document.getElementById('busqueda-control');
+    controlSearchInput.addEventListener('input', () => renderitzarControl(controlSearchInput.value.trim()));
+
+    function renderitzarControl(searchTerm = '') {
+        const container = document.getElementById('resultados-control');
+        container.innerHTML = '';
+        
+        let numerosAMostrar = appState.numeros.filter(n => n.estat !== 'venut').sort((a,b) => a.id.localeCompare(b.id));
+
+        if (searchTerm) {
+            numerosAMostrar = numerosAMostrar.filter(n => n.id.includes(searchTerm));
+        }
+        
+        if (numerosAMostrar.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400">No s\'han trobat números.</p>';
+            return;
+        }
+
+        numerosAMostrar.forEach(n => {
+            const item = document.createElement('div');
+            item.className = 'control-item flex items-center justify-between p-4 bg-white dark:bg-gray-800/50 border-l-4 rounded-r-lg shadow-md hover:shadow-lg hover:scale-[1.02] transform cursor-pointer';
+            let borderColor = (n.estat === 'disponible') ? 'border-green-500' : 'border-orange-500';
+            item.classList.add(borderColor);
+
+            item.innerHTML = `
+                <div>
+                    <span class="text-2xl font-bold tracking-wider text-gray-800 dark:text-gray-200">${n.id}</span>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">${formatarEstoc(n.estoc)}</p>
                 </div>
-            </div>
-        `;
+                <button class="add-to-cart-btn bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 dark:hover:bg-indigo-800/60 p-3 rounded-full hover:bg-indigo-200" data-id="${n.id}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                </button>`;
+            container.appendChild(item);
+
+            item.querySelector('.add-to-cart-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                afegirACistella(n.id);
+            });
+            item.addEventListener('click', () => obrirPopupVenda(n.id));
+        });
     }
 
-    // === LÒGICA DE CERCA ===
-    function buscar() {
-      // Obtenir tots els valors dels filtres
-      const input = busquedaInput.value.trim();
-      const tipoBusqueda = document.getElementById("tipoBusqueda").value;
-      const soloDisponibles = document.getElementById("soloDisponibles").checked;
-      const orden = document.getElementById("orden").value;
+    function obrirPopupVenda(numeroId) {
+        const numero = appState.numeros.find(n => n.id === numeroId);
+        if (!numero) return;
 
-      // Validació de l'entrada
-      if (!busquedaInput.checkValidity()) {
-        resultadosDiv.innerHTML = crearMissatge("Cal que introdueixis només xifres (entre 1 i 5).");
-        contadorDiv.textContent = '';
-        return;
-      }
-      
-      let resultados = [...numeros];
+        document.getElementById('popup-numero').textContent = numero.id;
+        document.getElementById('popup-estoc-actual').textContent = formatarEstoc(numero.estoc);
+        const quantitatInput = document.getElementById('popup-quantitat');
+        quantitatInput.value = 1;
+        quantitatInput.max = numero.estoc;
+        
+        document.getElementById('venda-popup').classList.remove('hidden');
+        document.getElementById('popup-actualitzar').onclick = () => processarVenda(numeroId);
+    }
+    
+    document.getElementById('popup-cancelar').addEventListener('click', () => {
+        document.getElementById('venda-popup').classList.add('hidden');
+    });
+    
+    document.querySelectorAll('.quick-add-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const quantitatInput = document.getElementById('popup-quantitat');
+            const qtyToAdd = parseInt(e.target.dataset.qty, 10);
+            quantitatInput.value = parseInt(quantitatInput.value, 10) + qtyToAdd;
+        });
+    });
 
-      // 1. Filtrar per disponibilitat
-      if (soloDisponibles) {
-        resultados = resultados.filter(n => !n.reservado);
-      }
+    function processarVenda(numeroId) {
+        const numero = appState.numeros.find(n => n.id === numeroId);
+        const quantitatInput = document.getElementById('popup-quantitat');
+        const quantitatVenuda = parseInt(quantitatInput.value, 10);
 
-      // 2. Filtrar per terme de cerca
-      if (input.length > 0) {
-        switch(tipoBusqueda) {
-          case 'terminacion':
-            resultados = resultados.filter(n => n.numero.endsWith(input));
-            break;
-          case 'inicio':
-            resultados = resultados.filter(n => n.numero.startsWith(input));
-            break;
-          case 'coincidencia':
-            resultados = resultados.filter(n => n.numero.includes(input));
-            break;
-          case 'completo':
-            resultados = resultados.filter(n => n.numero === input);
-            break;
-        }
-      }
+        if (isNaN(quantitatVenuda) || quantitatVenuda <= 0) return mostrarNotificacio("La quantitat ha de ser un número positiu.", 'error');
+        if (quantitatVenuda > numero.estoc) return mostrarNotificacio("No hi ha prou estoc per a aquesta venda.", 'error');
 
-      // 3. Ordenar els resultats
-      resultados.sort((a, b) => {
-        // La lògica per ordenar per terminació ara s'aplica a l'opció "numero"
-        if (orden === 'numero') {
-          // Inverteix els números per comparar-los com si comencessin pel final
-          const reversedA = a.numero.split('').reverse().join('');
-          const reversedB = b.numero.split('').reverse().join('');
-          return reversedA.localeCompare(reversedB);
-        }
-        if (orden === 'disponibilidad') {
-          if (a.reservado === b.reservado) { // Si tots dos estan disponibles o reservats, ordena per número
-            return a.numero.localeCompare(b.numero);
-          }
-          return a.reservado ? 1 : -1; // Els disponibles (false) van primer
-        }
-        return 0;
-      });
-      
-      // 4. Mostrar els resultats i el comptador
-      resultadosDiv.innerHTML = ""; // Neteja els resultats anteriors
-
-      if (resultados.length === 0) {
-        resultadosDiv.innerHTML = crearMissatge("No s'ha trobat cap número que coincideixi amb els filtres.");
-        contadorDiv.textContent = '0 resultats trobats.';
-      } else {
-        resultadosDiv.innerHTML = resultados.map(crearResultat).join("");
-        contadorDiv.textContent = `${resultados.length} de ${numeros.length} números trobats.`;
-      }
+        const nouEstoc = numero.estoc - quantitatVenuda;
+        const nouEstat = (nouEstoc === 0) ? 'venut' : numero.estat;
+        
+        database.ref(`numeros/${numeroId}`).update({ estoc: nouEstoc, estat: nouEstat })
+            .then(() => {
+                registrarHistorial(`Venda: -${quantitatVenuda} dècims del ${numeroId}. Estoc restant: ${nouEstoc}.`);
+                mostrarNotificacio(`Venda de ${quantitatVenuda} dècims del ${numeroId} realitzada!`);
+                document.getElementById('venda-popup').classList.add('hidden');
+            })
+            .catch(error => mostrarNotificacio(`Error: ${error.message}`, 'error'));
     }
 
-    // Executa la cerca inicial per mostrar tots els números al carregar la pàgina
-    window.onload = buscar;
+    // === LÒGICA DE LA CISTELLA ===
+    function afegirACistella(numeroId) {
+        if (!appState.cistella[numeroId]) appState.cistella[numeroId] = 0;
+        appState.cistella[numeroId]++;
+        actualitzarCistellaUI();
+        mostrarNotificacio(`${numeroId} afegit a la cistella`);
+    }
+
+    function actualitzarCistellaUI() {
+        const totalItems = Object.keys(appState.cistella).length;
+        if (totalItems > 0) {
+            cartButton.classList.remove('hidden');
+            cartCount.textContent = totalItems;
+        } else {
+            cartButton.classList.add('hidden');
+        }
+    }
+
+    cartButton.addEventListener('click', () => {
+        document.getElementById('cistella-popup').classList.remove('hidden');
+        renderitzarCistellaPopup();
+    });
+    
+    document.getElementById('cistella-tancar').addEventListener('click', () => {
+        document.getElementById('cistella-popup').classList.add('hidden');
+    });
+
+    function renderitzarCistellaPopup() {
+        const container = document.getElementById('cistella-contingut');
+        container.innerHTML = '';
+        if (Object.keys(appState.cistella).length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400">La cistella és buida.</p>';
+            return;
+        }
+
+        for (const numeroId in appState.cistella) {
+            const quantitat = appState.cistella[numeroId];
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded-md';
+            item.innerHTML = `
+                <span class="font-bold">${numeroId}</span>
+                <div class="flex items-center space-x-2">
+                    <button class="cistella-canviar-qty bg-gray-300 dark:bg-gray-600 w-6 h-6 rounded-full" data-id="${numeroId}" data-amount="-1">-</button>
+                    <span>${quantitat}</span>
+                    <button class="cistella-canviar-qty bg-gray-300 dark:bg-gray-600 w-6 h-6 rounded-full" data-id="${numeroId}" data-amount="1">+</button>
+                </div>
+                <button class="cistella-eliminar-item text-red-500 font-bold" data-id="${numeroId}">X</button>
+            `;
+            container.appendChild(item);
+        }
+    }
+    
+    document.getElementById('cistella-contingut').addEventListener('click', (e) => {
+        const target = e.target;
+        const numeroId = target.dataset.id;
+        if (!numeroId) return;
+
+        if (target.classList.contains('cistella-canviar-qty')) {
+            const amount = parseInt(target.dataset.amount, 10);
+            appState.cistella[numeroId] += amount;
+            if (appState.cistella[numeroId] <= 0) delete appState.cistella[numeroId];
+        } else if (target.classList.contains('cistella-eliminar-item')) {
+            delete appState.cistella[numeroId];
+        }
+        renderitzarCistellaPopup();
+        actualitzarCistellaUI();
+    });
+    
+    document.getElementById('cistella-processar').addEventListener('click', () => {
+        const updates = {};
+        const historialMissatges = [];
+        let error = false;
+        
+        for (const numeroId in appState.cistella) {
+            const quantitatVenuda = appState.cistella[numeroId];
+            const numero = appState.numeros.find(n => n.id === numeroId);
+            if (!numero || quantitatVenuda > numero.estoc) {
+                mostrarNotificacio(`No hi ha prou estoc per al número ${numeroId}.`, 'error');
+                error = true;
+                break;
+            }
+            const nouEstoc = numero.estoc - quantitatVenuda;
+            const nouEstat = (nouEstoc === 0) ? 'venut' : numero.estat;
+            updates[`/numeros/${numeroId}/estoc`] = nouEstoc;
+            updates[`/numeros/${numeroId}/estat`] = nouEstat;
+            historialMissatges.push(`Venda Cistella: -${quantitatVenuda} del ${numeroId}.`);
+        }
+
+        if (!error && Object.keys(updates).length > 0) {
+            database.ref().update(updates)
+                .then(() => {
+                    registrarHistorial(historialMissatges.join(' '));
+                    mostrarNotificacio('Venda de la cistella processada correctament!');
+                    appState.cistella = {};
+                    actualitzarCistellaUI();
+                    document.getElementById('cistella-popup').classList.add('hidden');
+                })
+                .catch(err => mostrarNotificacio(`Error en processar la cistella: ${err.message}`, 'error'));
+        }
+    });
+
+
+    // === SECCIÓ GESTIÓ BBDD ===
+    const gestioSearchInput = document.getElementById('gestio-busqueda');
+    gestioSearchInput.addEventListener('input', () => renderitzarGestio(gestioSearchInput.value.trim()));
+
+    function renderitzarGestio(searchTerm = '') {
+        const container = document.getElementById('gestio-llista');
+        container.innerHTML = '';
+        
+        let numerosAMostrar = [...appState.numeros].sort((a,b) => a.id.localeCompare(b.id));
+        if (searchTerm) {
+            numerosAMostrar = numerosAMostrar.filter(n => n.id.includes(searchTerm));
+        }
+
+        numerosAMostrar.forEach(n => {
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md';
+            item.innerHTML = `
+                <span class="font-mono">${n.id}</span>
+                <span class="text-sm">${n.estat} | <span class="font-semibold cursor-pointer gestio-estoc-editable" data-id="${n.id}">${n.estoc}</span> dècims</span>
+                <div class="flex space-x-2">
+                    <button class="gestio-estat-btn text-xs bg-yellow-500 text-white px-2 py-1 rounded-md" data-id="${n.id}">Canviar Estat</button>
+                    <button class="gestio-eliminar-btn text-xs bg-red-600 text-white px-2 py-1 rounded-md" data-id="${n.id}">Eliminar</button>
+                </div>`;
+            container.appendChild(item);
+        });
+    }
+
+    document.getElementById('gestio-afegir-btn').addEventListener('click', () => {
+        const idInput = document.getElementById('gestio-nou-numero');
+        const estocInput = document.getElementById('gestio-nou-estoc');
+        const id = idInput.value;
+        const estoc = parseInt(estocInput.value, 10);
+        if (id.length !== 5 || isNaN(estoc)) {
+            return mostrarNotificacio("Dades invàlides. El número ha de tenir 5 xifres i l'estoc ha de ser un número.", 'error');
+        }
+        database.ref(`numeros/${id}`).set({ estoc: estoc, estat: 'disponible' })
+            .then(() => {
+                registrarHistorial(`Creat: Número ${id} amb estoc ${estoc}.`);
+                mostrarNotificacio(`Número ${id} afegit correctament.`);
+                idInput.value = '';
+                estocInput.value = '';
+            })
+            .catch(error => mostrarNotificacio(`Error: ${error.message}`, 'error'));
+    });
+
+    document.getElementById('page-gestio').addEventListener('click', (e) => {
+        const target = e.target;
+        const numeroId = target.dataset.id;
+        if (!numeroId) return;
+
+        if (target.classList.contains('gestio-eliminar-btn')) {
+            if (confirm(`Segur que vols eliminar el número ${numeroId}? Aquesta acció no es pot desfer.`)) {
+                database.ref(`numeros/${numeroId}`).remove()
+                    .then(() => {
+                        registrarHistorial(`Eliminat: Número ${numeroId}.`);
+                        mostrarNotificacio(`Número ${numeroId} eliminat.`);
+                    })
+                    .catch(error => mostrarNotificacio(`Error: ${error.message}`, 'error'));
+            }
+        } else if (target.classList.contains('gestio-estat-btn')) {
+            const numero = appState.numeros.find(n => n.id === numeroId);
+            const estats = ['disponible', 'reservat', 'venut'];
+            const indexActual = estats.indexOf(numero.estat);
+            const nouEstat = estats[(indexActual + 1) % estats.length];
+            database.ref(`numeros/${numeroId}/estat`).set(nouEstat)
+                .then(() => {
+                    registrarHistorial(`Canvi Estat: ${numeroId} a ${nouEstat}.`);
+                    mostrarNotificacio(`Estat del ${numeroId} canviat a ${nouEstat}.`);
+                })
+                .catch(error => mostrarNotificacio(`Error: ${error.message}`, 'error'));
+        } else if (target.classList.contains('gestio-estoc-editable')) {
+            const estocSpan = target;
+            const estocActual = estocSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.value = estocActual;
+            input.className = 'w-16 text-center border rounded dark:bg-gray-600 dark:border-gray-500';
+            
+            estocSpan.replaceWith(input);
+            input.focus();
+            
+            const guardarCanvi = () => {
+                const nouEstoc = parseInt(input.value, 10);
+                if (!isNaN(nouEstoc) && nouEstoc >= 0) {
+                    database.ref(`numeros/${numeroId}/estoc`).set(nouEstoc)
+                        .then(() => {
+                            registrarHistorial(`Canvi Estoc: ${numeroId} a ${nouEstoc}.`);
+                            mostrarNotificacio(`Estoc del ${numeroId} actualitzat.`);
+                        })
+                        .catch(error => mostrarNotificacio(`Error: ${error.message}`, 'error'));
+                } else {
+                    renderitzarGestio(); // Si el valor no és vàlid, restaura la vista
+                }
+            };
+
+            input.addEventListener('blur', guardarCanvi);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') input.blur();
+                if (e.key === 'Escape') renderitzarGestio();
+            });
+        }
+    });
+    
+    // Lògica de les pestanyes de Gestió
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const tabId = button.dataset.tab;
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            button.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.toggle('hidden', content.id !== `tab-${tabId}`);
+            });
+        });
+    });
+    document.querySelector('.tab-button[data-tab="gestio-numeros"]').classList.add('active'); // Activar la primera per defecte
+
+    // Lògica de les Eines
+    document.getElementById('eina-alliberar-reservats').addEventListener('click', () => {
+        if (!confirm("Segur que vols passar TOTS els números 'reservat' a 'disponible'?")) return;
+        
+        const updates = {};
+        appState.numeros.forEach(n => {
+            if (n.estat === 'reservat') {
+                updates[`/numeros/${n.id}/estat`] = 'disponible';
+            }
+        });
+        
+        if (Object.keys(updates).length > 0) {
+            database.ref().update(updates)
+                .then(() => {
+                    registrarHistorial("Acció Massiva: Tots els números reservats han estat alliberats.");
+                    mostrarNotificacio("Tots els números reservats han estat alliberats.");
+                })
+                .catch(err => mostrarNotificacio(`Error en l'acció massiva: ${err.message}`, 'error'));
+        } else {
+            mostrarNotificacio("No hi ha cap número reservat per alliberar.", "error");
+        }
+    });
+
+    document.getElementById('eina-exportar-csv').addEventListener('click', () => {
+        let csvContent = "data:text/csv;charset=utf-8,Número,Estoc,Estat\n";
+        appState.numeros.forEach(n => {
+            csvContent += `${n.id},${n.estoc},${n.estat}\n`;
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "inventari_loteria.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        registrarHistorial("Exportació: S'ha exportat l'inventari a CSV.");
+    });
+    
+    // Lògica de l'Historial
+    function renderitzarHistorial() {
+        const container = document.getElementById('historial-llista');
+        container.innerHTML = '';
+        if (appState.historial.length === 0) {
+            container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400">No hi ha cap registre a l\'historial.</p>';
+            return;
+        }
+        appState.historial.forEach(entrada => {
+            const item = document.createElement('div');
+            item.className = 'p-2 bg-gray-50 dark:bg-gray-700/50 rounded-md text-sm';
+            item.innerHTML = `<span class="font-semibold text-gray-500 dark:text-gray-400">${entrada.data}:</span> ${entrada.missatge}`;
+            container.appendChild(item);
+        });
+    }
+
+    // === LÒGICA DEL MODE FOSC/CLAR ===
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            themeToggleLightIcon.classList.remove('hidden');
+            themeToggleDarkIcon.classList.add('hidden');
+        } else {
+            document.documentElement.classList.remove('dark');
+            themeToggleDarkIcon.classList.remove('hidden');
+            themeToggleLightIcon.classList.add('hidden');
+        }
+    }
+
+    themeToggleButton.addEventListener('click', () => {
+        const currentTheme = localStorage.getItem('color-theme') || (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem('color-theme', newTheme);
+        applyTheme(newTheme);
+    });
+
+
+    // === INICIALITZACIÓ DE L'APP ===
+    window.onload = () => {
+        // Aplica el tema guardat o el del sistema a l'inici
+        const initialTheme = localStorage.getItem('color-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(initialTheme);
+        
+        // Inicia la pàgina per defecte
+        canviarPagina('cerca');
+    };
   </script>
 </body>
 </html>
