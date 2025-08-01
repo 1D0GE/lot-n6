@@ -5,22 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Gestió de Loteria de Nadal</title>
   
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Configuració de Tailwind per al Dark Mode -->
   <script>
     tailwind.config = {
       darkMode: 'class',
     }
   </script>
 
-  <!-- Font de Google 'Inter' -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
   
-  <!-- SDK de Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -70,24 +66,19 @@
 </head>
 <body class="antialiased text-gray-800 dark:bg-gray-900 dark:text-gray-300 transition-colors duration-300">
 
-  <!-- ===== ESTRUCTURA PRINCIPAL DE L'APP ===== -->
   <div class="min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-2xl mx-auto">
       
-      <!-- Controls de la cantonada superior dreta -->
       <div class="fixed top-4 right-4 z-50 flex items-center space-x-4">
-        <!-- Botó de Mode Fosc/Clar -->
         <button id="theme-toggle" type="button" class="bg-white dark:bg-gray-800 p-3 rounded-full shadow-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
             <svg id="theme-toggle-dark-icon" class="hidden h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
             <svg id="theme-toggle-light-icon" class="hidden h-5 w-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.707.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05A1 1 0 003.636 6.464l.707.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zM6.464 14.364a1 1 0 00-1.414 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707z" fill-rule="evenodd" clip-rule="evenodd"></path></svg>
         </button>
-        <!-- Menú Burger -->
         <button id="menu-button" class="bg-white dark:bg-gray-800 p-3 rounded-full shadow-lg">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
         </button>
       </div>
 
-      <!-- Panell de Navegació -->
       <div id="navigation-panel" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 z-40">
         <nav class="absolute top-0 right-0 h-full bg-white dark:bg-gray-800 w-64 shadow-xl p-6">
           <h2 class="text-xl font-bold mb-6 text-gray-900 dark:text-white">Menú</h2>
@@ -105,7 +96,6 @@
       </header>
 
       <main class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8">
-        <!-- SECCIÓ 1: Cerca de Números -->
         <div id="page-cerca" class="page-section">
           <div class="form-controls">
             <div class="flex items-center space-x-2 border-2 border-gray-200 dark:border-gray-600 rounded-full p-2 focus-within:border-indigo-500 dark:focus-within:border-indigo-400 transition-colors">
@@ -142,7 +132,6 @@
           <div id="resultados-cerca" class="mt-2 space-y-3"></div>
         </div>
 
-        <!-- SECCIÓ 2: Control de Vendes -->
         <div id="page-control" class="page-section">
           <div class="mb-4">
               <input type="text" id="busqueda-control" placeholder="Cerca un número per vendre..." class="w-full p-3 border-2 border-gray-200 rounded-full focus:border-indigo-500 transition-colors dark:bg-gray-700 dark:border-gray-600 dark:text-white">
@@ -150,7 +139,6 @@
           <div id="resultados-control" class="space-y-3"></div>
         </div>
 
-        <!-- SECCIÓ 3: Gestió BBDD -->
         <div id="page-gestio" class="page-section">
             <h2 class="text-2xl font-bold mb-4">Panell d'Administració</h2>
             <div class="border-b border-gray-200 dark:border-gray-700 mb-4">
@@ -195,12 +183,10 @@
     </div>
   </div>
 
-  <!-- Botó flotant de la Cistella -->
   <button id="cart-button" class="hidden fixed bottom-6 right-6 z-30 bg-indigo-600 text-white py-3 px-5 rounded-full shadow-lg hover:bg-indigo-700">
       Cistella (<span id="cart-count">0</span>)
   </button>
 
-  <!-- Popup / Modal per a la venda ràpida -->
   <div id="venda-popup" class="hidden modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-11/12 max-w-md">
           <h2 class="text-2xl font-bold mb-4 dark:text-white">Vendre Número: <span id="popup-numero"></span></h2>
@@ -221,13 +207,11 @@
       </div>
   </div>
 
-  <!-- Popup / Modal per a la cistella -->
   <div id="cistella-popup" class="hidden modal fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl w-11/12 max-w-lg">
           <h2 class="text-2xl font-bold mb-4 dark:text-white">Cistella de la Compra</h2>
           <div id="cistella-contingut" class="max-h-64 overflow-y-auto space-y-3 mb-4">
-              <!-- El contingut de la cistella es generarà aquí -->
-          </div>
+              </div>
           <div class="flex justify-end space-x-3 mt-6">
               <button id="cistella-tancar" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">Tancar</button>
               <button id="cistella-processar" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Processar Venda</button>
@@ -421,6 +405,18 @@
                         ${icon}
                         <span>${statusText}</span>
                     </div>`;
+                
+                // ======================================================
+                // ================ INICI DE LA MODIFICACIÓ ===============
+                // ======================================================
+                if (n.estat !== 'venut') {
+                    item.classList.add('cursor-pointer');
+                    item.addEventListener('click', () => obrirPopupVenda(n.id));
+                }
+                // ======================================================
+                // ================== FI DE LA MODIFICACIÓ ================
+                // ======================================================
+
                 cercaElements.resultados.appendChild(item);
             });
         }
